@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+import 'package:mime/mime.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -33,45 +37,101 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  List<XFile>? _mediaFileList;
   int _counter = 0;
+
+  void _setImageFileListFromFile(XFile? value){
+    _mediaFileList = value == null ? null : <XFile>[value];
+  }
 
   void _incrementCounter() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
       _counter++;
     });
   }
 
+  dynamic _pickImageError;
+  String? _retrieveDataError;
+
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> _onImageButtonPressed(
+      ImageSource source, {
+        required BuildContext context,
+        bool isMultiImage = false,
+        bool isMedia = false,
+  }) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: source);
+      setState(() {
+        _setImageFileListFromFile(pickedFile);
+      });
+    } catch (e) {
+      setState(() {
+        _pickImageError = e;
+      });
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
+
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
+
         title: Text(widget.title),
       ),
       body: Center(
-        child: Text('Result of Bone Scan: '),
+        child: _mediaFileList != null
+            ? Semantics(
+          label: 'image_picker_example_picked_images',
+          child: ListView.builder(
+            key: UniqueKey(),
+            itemBuilder: (BuildContext context, int index) {
+              final String? mime =
+              lookupMimeType(_mediaFileList![index].path);
+
+              return Semantics(
+                label: 'image_picker_example_picked_image',
+                child: mime == null || mime.startsWith('image/')
+                    ? Image.file(
+                  File(_mediaFileList![index].path),
+                  errorBuilder: (BuildContext context,
+                      Object error, StackTrace? stackTrace) {
+                    return const Center(
+                        child: Text(
+                            'This image type is not supported'));
+                  },
+                )
+                    : Container(), // For non-image files
+              );
+            },
+            itemCount: _mediaFileList!.length,
+          ),
+        )
+            : _pickImageError != null
+            ? Text(
+          'Pick image error: $_pickImageError',
+          textAlign: TextAlign.center,
+        )
+            : const Text(
+          'You have not yet picked an image.',
+          textAlign: TextAlign.center,
+        ),
       ),
-      bottomNavigationBar: BottomAppBar(
+    bottomNavigationBar: BottomAppBar(
         shape: const CircularNotchedRectangle(),
         child: Container(height: 50.0),
       ),
-      floatingActionButton: FloatingActionButton(onPressed: _incrementCounter),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _onImageButtonPressed(ImageSource.gallery, context: context);
+        },
+        tooltip: 'Pick Image from gallery',
+        child: const Icon(Icons.photo),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
 
     );
